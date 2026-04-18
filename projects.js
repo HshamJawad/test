@@ -301,6 +301,16 @@ export function clearCurrentTab(tabId) {
 }
 
 // ── AI DACUM Generation ───────────────────────────────────────
+//
+// Flow:
+//   generateAIDacum()     → validation + scope gate (may return early)
+//   └── _runAIGeneration()→ actual API call + state population
+//
+// When scope is missing, generateAIDacum shows the yellow warning card
+// and RETURNS WITHOUT CALLING THE API.  The "⚡ Generate Anyway" button
+// inside that card calls _runAIGeneration() directly to resume with
+// the user's explicit consent.  This prevents wasted API quota and
+// gives the user a conscious choice.
 
 export async function generateAIDacum() {
   console.log('🚀 AI Generation Started');
@@ -312,34 +322,36 @@ export async function generateAIDacum() {
   }
 
   // ── Read inputs (occupationTitle required; rest optional) ──
-  const occupationTitle = document.getElementById('occupationTitle').value.trim();
-  const jobTitle        = document.getElementById('jobTitle').value.trim();
-  const scopeOfWork     = (document.getElementById('scopeOfWork')?.value || '').trim();
-  const sector          = document.getElementById('sector').value.trim();
-  const context         = document.getElementById('context').value.trim();
+  const inputs = _readAIInputs();
 
   // ── Hard validation: only Occupation Title is required ──
-  if (!occupationTitle) {
+  if (!inputs.occupationTitle) {
     alert('Please enter an Occupation Title to generate duties and tasks.');
     showStatus('Occupation Title is required for AI generation.', 'error');
     return;
   }
 
-  // ── Soft non-blocking hint: missing Scope of Work ──
-  // Surfaces a persistent yellow card below the AI generation block
-  // (rather than a transient 3-second toast that the loading modal
-  // would immediately cover) so the tip is actually readable.  The
-  // card:
-  //   • stays visible until dismissed or until Scope is filled
-  //   • has a × button for manual dismiss
-  //   • auto-hides as soon as the user types anything into #scopeOfWork
-  //   • is wired lazily on first use so index.html changes stay
-  //     self-contained (no events.js touch)
-  if (!scopeOfWork) {
+  // ── Soft gate: missing Scope of Work ──
+  // If Scope is empty, show the warning card and STOP.  The card's
+  // "Generate Anyway" button will resume via _runAIGeneration() when
+  // the user explicitly decides to proceed without a scope.  Per
+  // spec, we do not remember this choice — the card re-appears on
+  // every subsequent attempt while Scope stays empty.
+  if (!inputs.scopeOfWork) {
     _showScopeMissingWarning();
-  } else {
-    _hideScopeMissingWarning();
+    showStatus('Add a Scope of Work, or click "Generate Anyway" to proceed without one.', 'error');
+    return;
   }
+
+  // Scope is filled → hide any stale warning card and proceed
+  _hideScopeMissingWarning();
+  return _runAIGeneration(inputs);
+}
+
+// ── Actual generation pipeline (no validation — caller must validate) ──
+
+async function _runAIGeneration(inputs) {
+  const { occupationTitle, jobTitle, scopeOfWork, sector, context } = inputs;
 
   // Restrict to real text fields — buttons in Card View also carry
   // data-duty-id for their remove-duty action, which would incorrectly
@@ -626,19 +638,34 @@ function _resetHeading(headingId, defaultText) {
 
 // ── Scope-missing warning card ────────────────────────────────
 //
-// Self-contained UI for the "consider adding Scope of Work" tip.
+// Self-contained UI for the "missing Scope of Work" gate.
 // Lives here rather than events.js so the feature is one-file-owned.
 //
 // Contract:
 //   • Card element #scopeMissingWarning is defined in index.html
 //     (initially hidden via inline style="display:none").
-//   • First call to _showScopeMissingWarning() wires the × button
-//     and a one-shot 'input' listener on #scopeOfWork that hides
-//     the card automatically once the user starts typing.  Re-showing
-//     is idempotent — listeners are never double-bound.
-//   • _hideScopeMissingWarning() is a pure visibility setter.
+//   • First call to _showScopeMissingWarning() wires:
+//       – × dismiss button
+//       – "I'll add Scope first" button  (same hide behaviour as ×)
+//       – "⚡ Generate Anyway" button     (calls _runAIGeneration)
+//       – 'input' listener on #scopeOfWork that auto-hides the card
+//         once the user starts typing
+//   • Wiring is idempotent — listeners are never double-bound.
+//   • Per spec, the "Generate Anyway" decision is NOT remembered.
+//     Every subsequent Generate click without a scope re-shows the card.
 
 let _scopeWarningWired = false;
+
+/** Read AI inputs from chart info fields (trimmed). */
+function _readAIInputs() {
+  return {
+    occupationTitle: (document.getElementById('occupationTitle')?.value || '').trim(),
+    jobTitle:        (document.getElementById('jobTitle')?.value        || '').trim(),
+    scopeOfWork:     (document.getElementById('scopeOfWork')?.value     || '').trim(),
+    sector:          (document.getElementById('sector')?.value          || '').trim(),
+    context:         (document.getElementById('context')?.value         || '').trim(),
+  };
+}
 
 function _showScopeMissingWarning() {
   const card = document.getElementById('scopeMissingWarning');
@@ -648,14 +675,65 @@ function _showScopeMissingWarning() {
   if (_scopeWarningWired) return;
   _scopeWarningWired = true;
 
-  // × dismiss button
-  const btn = document.getElementById('btnDismissScopeWarning');
-  if (btn) btn.addEventListener('click', _hideScopeMissingWarning);
+  // × dismiss button (top-right)
+  const dismissBtn = document.getElementById('btnDismissScopeWarning');
+  if (dismissBtn) dismissBtn.addEventListener('click', _hideScopeMissingWarning);
 
-  // Auto-hide when Scope of Work starts getting filled.  We don't
-  // remove the listener after the first hide because the user might
-  // clear the field and re-trigger generation, and we want the tip
-  // to come back then auto-hide again.
+  // "I'll add Scope first" — same as dismiss, but labelled for clarity
+  const addScopeBtn = document.getElementById('btnAddScopeFirst');
+  if (addScopeBtn) {
+    addScopeBtn.addEventListener('click', function () {
+      _hideScopeMissingWarning();
+      // Helpful nudge: move focus to the Scope field so the user can
+      // start typing immediately without tab-hunting to Chart Info.
+      const scope = document.getElementById('scopeOfWork');
+      if (scope && typeof window.switchTab === 'function') {
+        try { window.switchTab('info-tab'); } catch (_) {}
+      }
+      setTimeout(() => { if (scope) scope.focus(); }, 80);
+    });
+  }
+
+  // "⚡ Generate Anyway" — explicit consent to proceed without scope.
+  // Calls _runAIGeneration directly, mirroring the success hook used
+  // by the main click path in events.js so Refine Results appears
+  // and the project is saved identically.
+  const anywayBtn = document.getElementById('btnGenerateAnyway');
+  if (anywayBtn) {
+    anywayBtn.addEventListener('click', async function () {
+      _hideScopeMissingWarning();
+
+      // Re-read inputs at click time (user may have edited other fields
+      // after the first Generate attempt).  Re-validate in case the
+      // user somehow emptied the Occupation Title meanwhile.
+      const inputs = _readAIInputs();
+      if (!inputs.occupationTitle) {
+        alert('Please enter an Occupation Title to generate duties and tasks.');
+        return;
+      }
+
+      // Daily-limit re-check (user may have burned quota elsewhere)
+      const status = checkUsageLimit();
+      if (!status.allowed) {
+        showStatus(`❌ Daily limit reached (${status.count} generations). Try again tomorrow!`, 'error');
+        return;
+      }
+
+      try {
+        const ok = await _runAIGeneration(inputs);
+        // Dispatch a custom event that events.js already listens for
+        // to keep Refine Results + project save behaviour identical
+        // to the main Generate button path.
+        if (ok) {
+          document.dispatchEvent(new CustomEvent('dacum:ai-generated'));
+        }
+      } catch (_) { /* error modal already shown inside _runAIGeneration */ }
+    });
+  }
+
+  // Auto-hide when Scope of Work starts getting filled.  Re-triggering
+  // is handled by re-showing from generateAIDacum each time the user
+  // clicks Generate while scope is empty.
   const scope = document.getElementById('scopeOfWork');
   if (scope) {
     scope.addEventListener('input', function () {

@@ -136,6 +136,18 @@ export function setupEvents() {
       })
       .catch(() => {});
   });
+
+  // ── "Generate Anyway" path (from the yellow Scope warning card) ──
+  // projects.js dispatches this event after a successful generation
+  // that bypassed the scope gate.  We mirror the main Generate button's
+  // post-success behaviour so Refine Results + history reset + project
+  // save + sidebar render all happen identically.
+  document.addEventListener('dacum:ai-generated', () => {
+    resetHistoryToCurrentState();
+    saveCurrentProject();
+    renderProjectsSidebar();
+    markAiGenerated();
+  });
   // Refine Results — runs soft cleanup on AI-generated duties/tasks
   _on('btnRefineResults', 'click', () => refineResults());
   _on('btnExportPDF',          'click', () => exportToPDF());
