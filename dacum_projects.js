@@ -120,6 +120,7 @@ export function importProjectFromData(data, fileName) {
       producedFor:     s.chartInfo?.producedFor      || '',
       producedBy:      s.chartInfo?.producedBy       || '',
       occupationTitle: s.chartInfo?.occupationTitle  || '',
+      scopeOfWork:     s.chartInfo?.scopeOfWork      || '',
       jobTitle:        s.chartInfo?.jobTitle         || '',
       sector:          s.chartInfo?.sector           || '',
       context:         s.chartInfo?.context          || '',
@@ -614,6 +615,7 @@ function _captureState() {
     producedFor:     _val('producedFor'),
     producedBy:      _val('producedBy'),
     occupationTitle: _val('occupationTitle'),
+    scopeOfWork:     _val('scopeOfWork'),
     jobTitle:        _val('jobTitle'),
     sector:          _val('sector'),
     context:         _val('context'),
@@ -712,7 +714,37 @@ function _applyState(s) {
   appState.lwFinalizedData          = s.lwFinalizedData          || null;
   appState.lwAggregatedResults      = s.lwAggregatedResults      || null;
   appState.lwIsFinalized            = s.lwIsFinalized            || false;
+
+  // ── Chart Info DOM hydration ───────────────────────────
+  // Writes the saved chartInfo values back into the input fields so
+  // switching between projects actually shows each project's own
+  // chart-info values.  Guards per-field so a missing input (e.g.
+  // during early init) never throws.  `_arrField` joins arrays with
+  // newlines for the facilitators/observers/panel textareas.
+  _hydrateChartInfoDOM(s._chartInfo || s.chartInfo || {});
+
   _applyLiveWorkshopDOM(s);
+}
+
+function _hydrateChartInfoDOM(ci) {
+  const setVal = (id, v) => {
+    const el = document.getElementById(id);
+    if (el && typeof v !== 'undefined') el.value = (v == null ? '' : v);
+  };
+  const arrToText = a => Array.isArray(a) ? a.join('\n') : (a || '');
+
+  setVal('dacumDate',       ci.dacumDate);
+  setVal('venue',           ci.venue);
+  setVal('producedFor',     ci.producedFor);
+  setVal('producedBy',      ci.producedBy);
+  setVal('occupationTitle', ci.occupationTitle);
+  setVal('scopeOfWork',     ci.scopeOfWork);
+  setVal('jobTitle',        ci.jobTitle);
+  setVal('sector',          ci.sector);
+  setVal('context',         ci.context);
+  setVal('facilitators',    arrToText(ci.facilitators));
+  setVal('observers',       arrToText(ci.observers));
+  setVal('panelMembers',    arrToText(ci.panelMembers));
 }
 
 // ── Restore live workshop DOM after project switch ─────────────

@@ -426,7 +426,18 @@
                     <label for="occupationTitle">💼 Occupation Title:</label>
                     <input type="text" id="occupationTitle" placeholder="e.g., Automotive Technician">
                 </div>
-                
+
+                <div class="mb-10">
+                    <label for="scopeOfWork">📋 Scope of Work / Occupational Definition:</label>
+                    <div style="font-size:0.82em; color:#6b7280; margin:-4px 0 6px 0; line-height:1.5;">
+                        A concise paragraph describing what the occupation covers and where its boundaries lie.
+                        Used in exports and can be referenced by AI generation to improve duty/task quality.
+                    </div>
+                    <textarea id="scopeOfWork" rows="5"
+                              placeholder="Defines the key responsibilities and boundaries of this occupation within its work context. Includes typical tasks, tools, and work environments, and excludes roles or functions that fall under other occupations or specializations."
+                              style="min-height: 110px; font-family: inherit; resize: vertical; width:100%;"></textarea>
+                </div>
+
                 <div class="mb-10">
                     <label for="jobTitle">👔 Job Title:</label>
                     <input type="text" id="jobTitle" placeholder="e.g., Service Technician Level 2">

@@ -469,6 +469,33 @@ export async function exportToWord() {
                     bidirectional: false,
                 }));
 
+                // Scope of Work / Occupational Definition (optional)
+                const scopeOfWorkEl    = document.getElementById('scopeOfWork');
+                const scopeOfWorkValue = (scopeOfWorkEl ? scopeOfWorkEl.value : '').trim();
+                if (scopeOfWorkValue) {
+                    children.push(new Paragraph({
+                        children: [
+                            new TextRun({
+                                text: 'Scope of Work / Occupational Definition:',
+                                bold: true,
+                                size: 24, // 12pt
+                            }),
+                        ],
+                        spacing: { before: 80, after: 80 },
+                        bidirectional: false,
+                    }));
+                    children.push(new Paragraph({
+                        children: [
+                            new TextRun({
+                                text: scopeOfWorkValue,
+                                size: 22, // 11pt
+                            }),
+                        ],
+                        spacing: { after: 200 },
+                        bidirectional: false,
+                    }));
+                }
+
                 children.push(new Paragraph({
                     children: [
                         new TextRun({
@@ -2616,6 +2643,37 @@ export function exportToPDF() {
         let workshopY = Math.max(leftY, rightY) + 15;
         const tableWidth = pageWidth - (2 * margin) - 20;
         const tableX = margin + 10;
+
+        // ─── Scope of Work / Occupational Definition (full-width, optional) ───
+        // Rendered below the two-column Produced For/By + Job block, before
+        // the Facilitators section.  Wrapped with splitTextToSize so long
+        // definitions flow across lines cleanly.  Paginates if the paragraph
+        // would overflow the current page.
+        const scopeOfWorkInput    = document.getElementById('scopeOfWork');
+        const scopeOfWorkValuePDF = scopeOfWorkInput ? scopeOfWorkInput.value.trim() : '';
+        if (scopeOfWorkValuePDF) {
+            if (workshopY + 20 > pageHeight - margin) {
+                pdf.addPage('a4', 'portrait');
+                workshopY = margin + 10;
+            }
+            pdf.setFontSize(14);
+            pdf.setFont(undefined, 'bold');
+            pdf.text('Scope of Work / Occupational Definition', tableX, workshopY);
+            workshopY += 6;
+
+            pdf.setFontSize(11);
+            pdf.setFont(undefined, 'normal');
+            const scopeLines = pdf.splitTextToSize(scopeOfWorkValuePDF, tableWidth);
+            scopeLines.forEach(line => {
+                if (workshopY + 5 > pageHeight - margin) {
+                    pdf.addPage('a4', 'portrait');
+                    workshopY = margin + 10;
+                }
+                pdf.text(line, tableX, workshopY);
+                workshopY += 5;
+            });
+            workshopY += 6;
+        }
         
         if (facilitatorsInput && facilitatorsInput.value.trim()) {
             const facilitatorNames = facilitatorsInput.value.split('\n').map(s => s.trim()).filter(s => s);

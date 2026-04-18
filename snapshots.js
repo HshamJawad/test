@@ -37,6 +37,7 @@ export function saveToJSON() {
         producedFor: document.getElementById('producedFor').value,
         producedBy: document.getElementById('producedBy').value,
         occupationTitle: document.getElementById('occupationTitle').value,
+        scopeOfWork: document.getElementById('scopeOfWork')?.value || '',
         jobTitle: document.getElementById('jobTitle').value,
         sector: document.getElementById('sector').value,
         context: document.getElementById('context').value,
@@ -283,6 +284,8 @@ export function loadFromJSONLegacy(event) {
           document.getElementById('producedFor').value = ci.producedFor || '';
           document.getElementById('producedBy').value = ci.producedBy || '';
           document.getElementById('occupationTitle').value = ci.occupationTitle || '';
+          const scopeEl = document.getElementById('scopeOfWork');
+          if (scopeEl) scopeEl.value = ci.scopeOfWork || '';
           document.getElementById('jobTitle').value = ci.jobTitle || '';
           document.getElementById('sector').value = ci.sector || '';
           document.getElementById('context').value = ci.context || '';

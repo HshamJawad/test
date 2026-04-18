@@ -99,7 +99,7 @@ export function clearAllSilent() {
 
 function _doClear() {
   // ── Chart Info ────────────────────────────────────────────
-  ['dacumDate','producedFor','producedBy','occupationTitle','jobTitle',
+  ['dacumDate','producedFor','producedBy','occupationTitle','scopeOfWork','jobTitle',
    'sector','context','venue','facilitators','observers','panelMembers'].forEach(id => {
     const el = document.getElementById(id);
     if (el) el.value = '';
@@ -227,7 +227,7 @@ export function clearCurrentTab(tabId) {
   if (!confirm('Are you sure you want to clear this tab? This cannot be undone!')) return;
 
   if (tabId === 'info-tab') {
-    ['dacumDate','venue','producedFor','producedBy','occupationTitle','jobTitle',
+    ['dacumDate','venue','producedFor','producedBy','occupationTitle','scopeOfWork','jobTitle',
      'sector','context','facilitators','observers','panelMembers'].forEach(id => {
       const el = document.getElementById(id);
       if (el) el.value = '';
