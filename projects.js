@@ -134,6 +134,9 @@ function _doClear() {
   document.getElementById('customSectionsContainer').innerHTML = '';
   appState.customSectionCounter = 0;
 
+  // Hide the scope-missing warning card if it was shown by a previous generation
+  _hideScopeMissingWarning();
+
   // ── Task Verification (individual ratings + UI) ───────────
   appState.verificationRatings  = {};
   appState.taskMetadata         = {};
@@ -323,10 +326,19 @@ export async function generateAIDacum() {
   }
 
   // ── Soft non-blocking hint: missing Scope of Work ──
-  // Uses the existing inline status banner (no modal) so the flow
-  // is never interrupted — the user sees it while the generation runs.
+  // Surfaces a persistent yellow card below the AI generation block
+  // (rather than a transient 3-second toast that the loading modal
+  // would immediately cover) so the tip is actually readable.  The
+  // card:
+  //   • stays visible until dismissed or until Scope is filled
+  //   • has a × button for manual dismiss
+  //   • auto-hides as soon as the user types anything into #scopeOfWork
+  //   • is wired lazily on first use so index.html changes stay
+  //     self-contained (no events.js touch)
   if (!scopeOfWork) {
-    showStatus('💡 For more accurate results, consider adding a Scope of Work.', 'success');
+    _showScopeMissingWarning();
+  } else {
+    _hideScopeMissingWarning();
   }
 
   // Restrict to real text fields — buttons in Card View also carry
@@ -610,4 +622,49 @@ function _resetHeading(headingId, defaultText) {
     el.textContent = defaultText;
     el.setAttribute('contenteditable', 'false');
   }
+}
+
+// ── Scope-missing warning card ────────────────────────────────
+//
+// Self-contained UI for the "consider adding Scope of Work" tip.
+// Lives here rather than events.js so the feature is one-file-owned.
+//
+// Contract:
+//   • Card element #scopeMissingWarning is defined in index.html
+//     (initially hidden via inline style="display:none").
+//   • First call to _showScopeMissingWarning() wires the × button
+//     and a one-shot 'input' listener on #scopeOfWork that hides
+//     the card automatically once the user starts typing.  Re-showing
+//     is idempotent — listeners are never double-bound.
+//   • _hideScopeMissingWarning() is a pure visibility setter.
+
+let _scopeWarningWired = false;
+
+function _showScopeMissingWarning() {
+  const card = document.getElementById('scopeMissingWarning');
+  if (!card) return;
+  card.style.display = 'block';
+
+  if (_scopeWarningWired) return;
+  _scopeWarningWired = true;
+
+  // × dismiss button
+  const btn = document.getElementById('btnDismissScopeWarning');
+  if (btn) btn.addEventListener('click', _hideScopeMissingWarning);
+
+  // Auto-hide when Scope of Work starts getting filled.  We don't
+  // remove the listener after the first hide because the user might
+  // clear the field and re-trigger generation, and we want the tip
+  // to come back then auto-hide again.
+  const scope = document.getElementById('scopeOfWork');
+  if (scope) {
+    scope.addEventListener('input', function () {
+      if (scope.value.trim()) _hideScopeMissingWarning();
+    });
+  }
+}
+
+function _hideScopeMissingWarning() {
+  const card = document.getElementById('scopeMissingWarning');
+  if (card) card.style.display = 'none';
 }

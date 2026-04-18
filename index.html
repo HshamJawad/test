@@ -492,7 +492,33 @@
                 <button class="btn-ai-generate" id="aiGenerateBtn"  style="background: white; color: #667eea; padding: 12px 30px; font-size: 1.05em; font-weight: bold; border: none; border-radius: 8px; cursor: pointer; transition: all 0.3s; box-shadow: 0 4px 15px rgba(0,0,0,0.2);">
                     🤖 Generate AI Draft
                 </button>
-                <p style="color: rgba(255,255,255,0.8); margin: 15px 0 0 0; font-size: 0.85em;">💡 Make sure to fill Occupation Title and Job Title in Chart Info tab first</p>
+                <p style="color: rgba(255,255,255,0.8); margin: 15px 0 0 0; font-size: 0.85em;">💡 Fill Occupation Title in Chart Info. Adding Scope of Work &amp; Job Title improves results.</p>
+            </div>
+
+            <!-- Missing-Scope soft warning (hidden until user clicks Generate without Scope) -->
+            <div id="scopeMissingWarning" style="display:none; margin: -10px 0 22px 0;">
+                <div style="display:flex; align-items:flex-start; gap:14px; padding:13px 18px;
+                            background:#fffbeb; border:1.5px solid #fbbf24; border-radius:10px;">
+                    <span style="font-size:1.2em; flex-shrink:0; line-height:1.3;">💡</span>
+                    <div style="flex:1; min-width:0;">
+                        <p style="margin:0 0 3px; font-size:0.88em; font-weight:700; color:#92400e;">
+                            Tip: Add a Scope of Work for better results
+                        </p>
+                        <p style="margin:0; font-size:0.8em; color:#78350f; line-height:1.5;">
+                            Generation works without it, but the AI will be more accurate and stay within the right boundaries when you provide a short Scope paragraph in Chart Info. Dismiss this anytime.
+                        </p>
+                    </div>
+                    <button id="btnDismissScopeWarning"
+                            title="Dismiss"
+                            aria-label="Dismiss scope warning"
+                            style="flex-shrink:0; background:transparent; border:none; font-size:1.2em;
+                                   color:#92400e; cursor:pointer; padding:2px 8px; border-radius:4px;
+                                   opacity:0.6; transition:opacity 0.15s, background 0.15s;"
+                            onmouseover="this.style.opacity='1';this.style.background='rgba(251,191,36,0.2)';"
+                            onmouseout="this.style.opacity='0.6';this.style.background='transparent';">
+                        ×
+                    </button>
+                </div>
             </div>
 
             <!-- Refine Results (hidden until AI generates) -->
