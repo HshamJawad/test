@@ -447,8 +447,9 @@ export async function exportToWord() {
                 const occupationTitle = document.getElementById('occupationTitle').value;
                 const jobTitle = document.getElementById('jobTitle').value;
 
-                if (!occupationTitle || !jobTitle) {
-                    showStatus('Please fill in at least the Occupation Title and Job Title', 'error');
+                if (!occupationTitle) {
+                    alert('Please enter an Occupation Title before exporting.');
+                    showStatus('Occupation Title is required for export.', 'error');
                     return;
                 }
 
@@ -496,17 +497,20 @@ export async function exportToWord() {
                     }));
                 }
 
-                children.push(new Paragraph({
-                    children: [
-                        new TextRun({
-                            text: `Job Title: ${jobTitle}`,
-                            bold: true,
-                            size: 28, // 14pt
-                        }),
-                    ],
-                    spacing: { after: 200 },
-                    bidirectional: false,
-                }));
+                // Job Title is optional — skip the paragraph entirely when empty
+                if (jobTitle && jobTitle.trim()) {
+                    children.push(new Paragraph({
+                        children: [
+                            new TextRun({
+                                text: `Job Title: ${jobTitle}`,
+                                bold: true,
+                                size: 28, // 14pt
+                            }),
+                        ],
+                        spacing: { after: 200 },
+                        bidirectional: false,
+                    }));
+                }
 
                 // Add DACUM Date if exists
                 if (dacumDate) {
@@ -2164,7 +2168,9 @@ export async function exportToWord() {
                 const url = URL.createObjectURL(blob);
                 const link = document.createElement('a');
                 link.href = url;
-                link.download = `${occupationTitle.replace(/[^a-z0-9]/gi, '_')}_${jobTitle.replace(/[^a-z0-9]/gi, '_')}_DACUM_Chart.docx`;
+                const _occSlug = occupationTitle.replace(/[^a-z0-9]/gi, '_');
+                const _jobSlug = (jobTitle && jobTitle.trim()) ? `_${jobTitle.replace(/[^a-z0-9]/gi, '_')}` : '';
+                link.download = `${_occSlug}${_jobSlug}_DACUM_Chart.docx`;
                 document.body.appendChild(link);
                 link.click();
                 document.body.removeChild(link);
@@ -2530,9 +2536,10 @@ export function exportToPDF() {
         const trendsInput = document.getElementById('trendsInput');
         const acronymsInput = document.getElementById('acronymsInput');
         
-        // Validation
-        if (!occupationTitleInput.value || !jobTitleInput.value) {
-            alert('Please fill in at least the Occupation Title and Job Title');
+        // Validation — Occupation Title required; Job Title optional
+        if (!occupationTitleInput.value) {
+            alert('Please enter an Occupation Title before exporting.');
+            showStatus('Occupation Title is required for export.', 'error');
             return;
         }
         
@@ -2625,15 +2632,18 @@ export function exportToPDF() {
         pdf.text('Occupation:', rightColX, rightY);
         pdf.setFont(undefined, 'normal');
         pdf.setFontSize(14); // 14pt for content
-        pdf.text(jobTitleInput.value, rightColX + 30, rightY);
+        pdf.text(jobTitleInput.value || '', rightColX + 30, rightY);
         rightY += 7;
-        
-        pdf.setFontSize(16); // 16pt for labels
-        pdf.setFont(undefined, 'bold');
-        pdf.text('Job:', rightColX, rightY);
-        pdf.setFont(undefined, 'normal');
-        pdf.setFontSize(14); // 14pt for content
-        pdf.text(occupationTitleInput.value, rightColX + 15, rightY);
+
+        // Job line — only if filled (skips orphan "Job:" label with empty value)
+        if (jobTitleInput.value && jobTitleInput.value.trim()) {
+            pdf.setFontSize(16); // 16pt for labels
+            pdf.setFont(undefined, 'bold');
+            pdf.text('Job:', rightColX, rightY);
+            pdf.setFont(undefined, 'normal');
+            pdf.setFontSize(14); // 14pt for content
+            pdf.text(occupationTitleInput.value, rightColX + 15, rightY);
+        }
         
         // Workshop Roles Section
         const facilitatorsInput = document.getElementById('facilitators');
@@ -3872,7 +3882,10 @@ export function exportToPDF() {
             });
         }
         
-        pdf.save(`${occupationTitleInput.value}_${jobTitleInput.value}_DACUM_Chart.pdf`);
+        const _pdfOccSlug = occupationTitleInput.value.replace(/[^a-z0-9]/gi, '_');
+        const _pdfJobVal  = (jobTitleInput.value || '').trim();
+        const _pdfJobSlug = _pdfJobVal ? `_${_pdfJobVal.replace(/[^a-z0-9]/gi, '_')}` : '';
+        pdf.save(`${_pdfOccSlug}${_pdfJobSlug}_DACUM_Chart.pdf`);
         showStatus('PDF exported successfully! ✓', 'success');
         
     } catch (error) {
