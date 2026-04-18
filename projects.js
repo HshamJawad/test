@@ -308,14 +308,25 @@ export async function generateAIDacum() {
     return;
   }
 
+  // ── Read inputs (occupationTitle required; rest optional) ──
   const occupationTitle = document.getElementById('occupationTitle').value.trim();
   const jobTitle        = document.getElementById('jobTitle').value.trim();
+  const scopeOfWork     = (document.getElementById('scopeOfWork')?.value || '').trim();
   const sector          = document.getElementById('sector').value.trim();
   const context         = document.getElementById('context').value.trim();
 
-  if (!occupationTitle || !jobTitle) {
-    showStatus('Please enter both Occupation Title and Job Title before generating AI draft', 'error');
+  // ── Hard validation: only Occupation Title is required ──
+  if (!occupationTitle) {
+    alert('Please enter an Occupation Title to generate duties and tasks.');
+    showStatus('Occupation Title is required for AI generation.', 'error');
     return;
+  }
+
+  // ── Soft non-blocking hint: missing Scope of Work ──
+  // Uses the existing inline status banner (no modal) so the flow
+  // is never interrupted — the user sees it while the generation runs.
+  if (!scopeOfWork) {
+    showStatus('💡 For more accurate results, consider adding a Scope of Work.', 'success');
   }
 
   // Restrict to real text fields — buttons in Card View also carry
@@ -335,56 +346,62 @@ export async function generateAIDacum() {
   showLoadingModal();
   await new Promise(resolve => setTimeout(resolve, 100));
 
-  const prompt = `You are an occupational analysis engine. Your task is to generate a DATA-INFORMED DACUM DRAFT that will be injected directly into a DACUM chart user interface.
+  // ── Dynamic prompt — only include fields that are non-empty ──
+  // Each optional line is a single template expression that evaluates
+  // to '' when the corresponding field is blank, so the AI never sees
+  // empty "Field: " lines that would dilute the signal.
+  const prompt = `You are an occupational analysis engine specialized in DACUM methodology.
+Your task is to generate a DATA-INFORMED DACUM DRAFT that will be injected directly into a DACUM chart UI.
 
 INPUT:
-Occupation Title: ${occupationTitle}
-Job / Role: ${jobTitle}${sector ? `\nSector: ${sector}` : ''}${context ? `\nCountry / Context: ${context}` : ''}
+Occupation Title (BASE CONTEXT): ${occupationTitle}${jobTitle ? `
+Job / Role (PRIMARY FOCUS): ${jobTitle}` : ''}${scopeOfWork ? `
+Scope of Work (CRITICAL BOUNDARY): ${scopeOfWork}` : ''}${sector ? `
+Sector: ${sector}` : ''}${context ? `
+Country / Context: ${context}` : ''}
+
+SCOPE INTERPRETATION RULE (VERY IMPORTANT):
+- If Scope of Work is provided → it DEFINES and LIMITS the analysis.
+- If Job Title is provided → generate duties/tasks for that specific job within the occupation.
+- If Job Title is NOT provided → assume a generic role within the occupation,
+  but STRICTLY guided by the Scope if available.
+- Never generate for the full occupation unless neither Scope nor Job Title are provided.
 
 TASK:
-Generate a DACUM draft for the SPECIFIED JOB / ROLE (not the entire occupation).
+Generate a DACUM draft that reflects the REAL WORK performed within the defined scope.
 
-STRUCTURE GUIDELINES (NOT FIXED LIMITS):
-- Identify a reasonable number of DUTIES, usually between 6 and 12,
-  sufficient to fully cover the JOB being analyzed.
-- For each DUTY, generate a variable number of TASKS, usually between 6 and 20,
-  based on the actual work required for that duty.
-- Different duties may have different numbers of tasks.
-- The total number of tasks for the JOB is usually between 75 and 125,
-  but completeness and logical job coverage take priority over numeric targets.
+STRUCTURE GUIDELINES (FLEXIBLE):
+- Duties: typically 6–12 (based on actual scope coverage)
+- Tasks per duty: typically 6–20
+- Total tasks: usually 75–125
+- STOP when the job scope is logically complete (do NOT force numbers)
 
-PRIORITY RULE:
-- Stop generating duties or tasks once the JOB scope is fully and logically covered,
-  even if the upper guideline limits have not been reached.
+DUTY RULES:
+- Represent major responsibility areas within the defined scope
+- Use verb-based responsibility titles
+  (e.g., "Apply Safety, Health, Environment and Quality in the Workplace")
+- Avoid overlap or duplication between duties
 
-RULES FOR DUTIES:
-- Duties represent broad areas of responsibility within the JOB.
-- Duties must be written as responsibility titles.
-- Use verb-based responsibility phrasing
-  (e.g., "Apply Safety, Health, Environment and Quality in the Workplace").
-- Avoid overlap or duplication between duties.
+TASK RULES:
+- Start with ONE clear occupational action verb
+- Format: Verb + Object (+ qualifier if needed)
+- Use only observable, hands-on work actions
+- Use ONE verb only per task (no combined or compound verbs)
+- NO outcomes, NO intentions (avoid "to ensure", "in order to", etc.)
+- NO learning/cognitive verbs (understand, learn, know, recognize)
+- NO tools, equipment, materials, knowledge, or competencies as task content
+- NO administrative, managerial, or policy-oriented verbs
+  (comply, adhere, manage, coordinate, supervise, report)
+- Focus strictly on real, hands-on job execution tasks
 
-RULES FOR TASKS:
-- Each task must start with ONE clear occupational action verb.
-- Use operational, observable verbs only
-  (e.g., Install, Inspect, Maintain, Test, Repair, Calibrate, Diagnose, Configure).
-- Follow the structure: Verb + Object + (Qualifier if needed).
-- Use ONE verb only per task (no combined or compound verbs).
-- Tasks must describe what the worker DOES, not outcomes, purposes, or intentions.
-- Tasks must describe real, observable work activities.
-- Do NOT include outcomes, results, or phrases such as "to ensure", "in order to".
-- Do NOT use learning, academic, or cognitive verbs (e.g., understand, learn, know).
-- Do NOT include competencies, skills, knowledge, tools, equipment, software,
-  materials, or safety rules.
-- Tasks must be specific, concrete, and actionable.
-- Avoid organizational, administrative, or policy-oriented verbs
-  (e.g., comply, adhere, manage, coordinate, supervise, report).
-- Focus on hands-on job-specific work activities performed directly by the worker.
+QUALITY CONTROL:
+- Ensure all duties and tasks stay INSIDE the defined scope
+- Avoid generic occupation-wide tasks when a scope is given
+- Prefer specificity over completeness when the two conflict
 
 METHODOLOGICAL NOTE:
-- Use labor-market and contextual signals for realism (data-informed),
-  but prioritize expert occupational logic and job coherence
-  over generic data patterns.
+- Be data-informed using labor-market and contextual signals for realism,
+  but prioritize expert DACUM logic and job coherence over generic patterns.
 
 OUTPUT FORMAT (STRICT – NO EXTRA TEXT):
 Return ONLY valid JSON using the following structure:
