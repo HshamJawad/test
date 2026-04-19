@@ -85,7 +85,7 @@ function _updateToggleButton() {
   if (heading) {
     heading.textContent = mode === 'card'  ? 'Card View — Duties & Tasks'
                         : mode === 'table' ? 'Duties and Tasks'
-                        : 'Wall View — Workshop Display';
+                        : 'Wall View — DACUM Research Chart';
   }
 }
 
