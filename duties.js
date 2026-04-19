@@ -491,7 +491,7 @@ function _renderWallView(container) {
       const note = document.createElement('div');
       note.className = 'wall-task-card';
       note.innerHTML = `
-        <span class="wall-task-code">${_esc(letter)}${taskIndex + 1}</span>
+        <span class="wall-task-code">Task ${_esc(letter)}${taskIndex + 1}</span>
         <span class="wall-task-text">${_esc(task.text) || '<em style="opacity:0.5">—</em>'}</span>
       `;
       tasksWrap.appendChild(note);

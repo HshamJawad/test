@@ -374,6 +374,7 @@
       body.wall-view-active #scopeMissingWarning,
       body.wall-view-active #duties-tab > h2,
       body.wall-view-active #duties-tab > [data-action="clear-tab"],
+      body.wall-view-active #duties-tab > div:has([data-action="clear-tab"]),
       body.wall-view-active #duties-tab > div:has(> #aiGenerateBtn),
       body.wall-view-active #btnAddDuty,
       body.wall-view-active #btnAddDutyCard,
@@ -579,6 +580,8 @@
       :fullscreen body.wall-view-active #dutiesViewHeading,
       :fullscreen body.wall-view-active .view-segmented,
       :fullscreen body.wall-view-active #btnToggleDutiesView,
+      :fullscreen body.wall-view-active #duties-tab > div:has([data-action="clear-tab"]),
+      :fullscreen body.wall-view-active [data-action="clear-tab"],
       body.wall-view-fullscreen #dacumTopToolbar,
       body.wall-view-fullscreen #dacumProjectsSidebar,
       body.wall-view-fullscreen .tab-buttons,
@@ -586,25 +589,46 @@
       body.wall-view-fullscreen #scopeMissingWarning,
       body.wall-view-fullscreen #dutiesViewHeading,
       body.wall-view-fullscreen .view-segmented,
-      body.wall-view-fullscreen #btnToggleDutiesView {
+      body.wall-view-fullscreen #btnToggleDutiesView,
+      body.wall-view-fullscreen #duties-tab > div:has([data-action="clear-tab"]),
+      body.wall-view-fullscreen [data-action="clear-tab"] {
         display: none !important;
       }
-      :fullscreen body.wall-view-active .container,
-      body.wall-view-fullscreen .container {
-        margin-left: 0 !important;
-        padding: 6px !important;
+      /* Fullscreen: collapse all vertical spacing above the toolbar
+         so the wall content starts right at the top edge of the screen. */
+      :fullscreen body.wall-view-active,
+      body.wall-view-fullscreen {
+        margin: 0 !important;
       }
       :fullscreen body.wall-view-active #dacumAppWrapper,
       body.wall-view-fullscreen #dacumAppWrapper {
         margin-left: 0 !important;
+        padding: 0 !important;
+      }
+      :fullscreen body.wall-view-active .container,
+      body.wall-view-fullscreen .container {
+        margin: 0 !important;
+        padding: 6px !important;
+        padding-top: 0 !important;
+      }
+      :fullscreen body.wall-view-active #duties-tab,
+      body.wall-view-fullscreen #duties-tab {
+        padding-top: 0 !important;
+        margin-top: 0 !important;
+      }
+      :fullscreen body.wall-view-active .wall-view-mode,
+      body.wall-view-fullscreen .wall-view-mode {
+        margin-top: 0 !important;
       }
       :fullscreen body.wall-view-active .wall-toolbar,
       body.wall-view-fullscreen .wall-toolbar {
-        top: 0;   /* no 60px top bar anymore */
+        top: 0;            /* no 60px top bar anymore */
+        margin-top: 0;     /* sits flush with the top edge */
+        border-radius: 0 0 10px 10px;   /* only bottom corners rounded */
       }
       :fullscreen body.wall-view-active .wall-rows-scroll,
       body.wall-view-fullscreen .wall-rows-scroll {
-        max-height: calc(100vh - 70px);
+        max-height: calc(100vh - 60px);
       }
 
       /* Smooth scrollbars (optional cosmetic) */
