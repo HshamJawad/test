@@ -7,7 +7,7 @@
 import { appState }             from './state.js';
 import { addDuty, addTask, removeDuty, removeTask, clearDuty,
          syncAllFromDOM, syncDutyTitle, syncTaskText,
-         toggleViewMode }                              from './duties.js';
+         toggleViewMode, switchToViewMode }            from './duties.js';
 import { pushHistoryState, undo, redo,
          resetHistoryToCurrentState }                  from './history.js';
 import { updateCollectionMode, updateWorkflowMode, updateParticipantCount,
@@ -258,8 +258,20 @@ export function setupEvents() {
       }
     });
 
-    // View toggle button
+    // View toggle button (legacy 2-state Card ↔ Table)
     _on('btnToggleDutiesView', 'click', toggleViewMode);
+
+    // Segmented view switch (3-state: Card / Table / Wall) — delegated
+    // so it works even if the buttons are re-rendered.  Any element
+    // with data-view-switch="card|table|wall" triggers switchToViewMode.
+    document.addEventListener('click', function (e) {
+      const btn = e.target.closest('[data-view-switch]');
+      if (!btn) return;
+      const mode = btn.getAttribute('data-view-switch');
+      if (mode === 'card' || mode === 'table' || mode === 'wall') {
+        switchToViewMode(mode);
+      }
+    });
 
     // Word-level text undo (burst model) — works for input (table) and textarea (card)
     const _dutyOrTask = 'input[data-duty-id], input[data-task-id], textarea[data-duty-id], textarea[data-task-id]';

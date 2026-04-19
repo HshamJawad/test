@@ -77,7 +77,8 @@ function _scheduleInit() {
 // ── Duty-level sortable ──────────────────────────────────────
 
 function _initDutiesContainer() {
-  // Only in Card View — Table View keeps its original behaviour
+  // Only in Card View — Table View and Wall View keep their original behaviour
+  if (document.body.classList.contains('wall-view-active')) return;
   if (getViewMode() !== 'card') return;
 
   const container = document.getElementById('dutiesContainer');
@@ -167,7 +168,8 @@ function _onDutyDragEnd(evt) {
 // ── Task-level sortable (existing, unchanged) ────────────────
 
 function _initAllScrolls() {
-  // Only active in Card View — Table View keeps its original behaviour
+  // Only active in Card View — Table View and Wall View keep their own behaviour
+  if (document.body.classList.contains('wall-view-active')) return;
   if (getViewMode() !== 'card') return;
 
   document.querySelectorAll('.dcv-tasks-scroll').forEach(scrollEl => {

@@ -17,32 +17,76 @@ import { showStatus } from './renderer.js';
 import { getDutyLetter, getTaskCode as _codesTaskCode } from './codes.js';
 
 // ── View mode (persisted) ─────────────────────────────────────
+//
+// Three modes:
+//   'card'  → default editable card view (with drag & drop)
+//   'table' → compact table view (editable, no drag)
+//   'wall'  → read-only DACUM wall display (full-width, auto-zoom)
+//
+// Wall View is NOT persisted across sessions — it's a presentation
+// mode, not a work mode.  If the persisted mode is 'wall' on load,
+// we silently fall back to 'card' so the user doesn't get stuck.
 
 const LS_VIEW = 'dacum_view_mode';
 
 export function getViewMode() {
-  return localStorage.getItem(LS_VIEW) || 'card';   // default: card view
+  const m = localStorage.getItem(LS_VIEW) || 'card';
+  // Never boot into wall view — it's a one-off presentation mode
+  return m === 'wall' ? 'card' : m;
 }
 
 export function setViewMode(mode) {
-  localStorage.setItem(LS_VIEW, mode);
+  if (mode === 'wall') {
+    // Keep the non-wall preference persisted so Exit returns to it.
+    // Also tag body + container so CSS can break out of max-width, etc.
+    document.body.classList.add('wall-view-active');
+  } else {
+    localStorage.setItem(LS_VIEW, mode);
+    document.body.classList.remove('wall-view-active');
+  }
 }
 
+/** Toggle Card ↔ Table (legacy single-button behaviour). */
 export function toggleViewMode() {
-  const next = getViewMode() === 'card' ? 'table' : 'card';
+  const cur  = getViewMode();
+  const next = cur === 'card' ? 'table' : 'card';
   setViewMode(next);
   renderDutiesFromState();
   _updateToggleButton();
 }
 
+/** Switch to a specific view mode — used by the 3-button segmented control. */
+export function switchToViewMode(mode) {
+  if (!['card','table','wall'].includes(mode)) return;
+  setViewMode(mode);
+  renderDutiesFromState();
+  _updateToggleButton();
+}
+
+/** Current mode including wall (getViewMode() hides wall for boot safety). */
+function _activeMode() {
+  return document.body.classList.contains('wall-view-active') ? 'wall' : getViewMode();
+}
+
 function _updateToggleButton() {
   const btn     = document.getElementById('btnToggleDutiesView');
   const heading = document.getElementById('dutiesViewHeading');
-  if (!btn) return;
-  const isCard = getViewMode() === 'card';
-  btn.textContent = isCard ? '📋 Table View' : '🃏 Card View';
-  btn.className   = 'dcv-toggle-btn' + (isCard ? ' is-card' : '');
-  if (heading) heading.textContent = isCard ? 'Card View — Duties & Tasks' : 'Duties and Tasks';
+  const mode    = _activeMode();
+  if (btn) {
+    const isCard = mode === 'card';
+    btn.textContent = isCard ? '📋 Table View' : '🃏 Card View';
+    btn.className   = 'dcv-toggle-btn' + (isCard ? ' is-card' : '');
+  }
+  // Update segmented toggle's active button (if present)
+  document.querySelectorAll('[data-view-switch]').forEach(el => {
+    const target = el.getAttribute('data-view-switch');
+    el.classList.toggle('is-active', target === mode);
+  });
+  if (heading) {
+    heading.textContent = mode === 'card'  ? 'Card View — Duties & Tasks'
+                        : mode === 'table' ? 'Duties and Tasks'
+                        : 'Wall View — Workshop Display';
+  }
 }
 
 // ── DOM Renderer ──────────────────────────────────────────────
@@ -59,11 +103,10 @@ export function renderDutiesFromState() {
 
   _updateToggleButton();
 
-  if (getViewMode() === 'card') {
-    _renderCardView(container);
-  } else {
-    _renderTableView(container);
-  }
+  const mode = _activeMode();
+  if (mode === 'wall')       _renderWallView(container);
+  else if (mode === 'card')  _renderCardView(container);
+  else                       _renderTableView(container);
 }
 
 // ── TABLE VIEW (original, unchanged) ─────────────────────────
@@ -212,6 +255,12 @@ function _setAddDutyVisibility(mode) {
       cardBtn.onclick = () => addDuty();
     }
     cardBtn.style.display = 'inline-flex';
+  } else if (mode === 'wall') {
+    // Wall View is read-only: hide both add-duty buttons so the
+    // presentation surface stays clean.  They return when the user
+    // switches back to Card or Table view.
+    if (orig)    orig.style.display    = 'none';
+    if (cardBtn) cardBtn.style.display = 'none';
   } else {
     if (orig)    orig.style.display    = '';
     if (cardBtn) cardBtn.style.display = 'none';
@@ -339,3 +388,220 @@ function _esc(str) {
     .replace(/</g, '&lt;')
     .replace(/>/g, '&gt;');
 }
+
+// ── WALL VIEW (read-only, full-width, auto-zoom) ─────────────
+//
+// Horizontal layout per duty: blue duty card on the left, yellow
+// sticky-note-style task cards flowing to the right.  Tasks wrap
+// onto multiple rows within the duty row when they exceed viewport
+// width — no horizontal scrollbar pollution.
+//
+// Auto-zoom runs on each render: computes a base font-size + card
+// width from the largest task row and the viewport.  A sessionStorage
+// multiplier lets the user override via 🔍+ / 🔍− buttons; it does
+// NOT cross sessions.
+//
+// All editing is disabled: text is rendered as plain content, no
+// inputs, no buttons for add/remove.  Drag-and-drop's MutationObserver
+// will see the new .wall-view-mode class and simply skip re-init
+// (drag_drop.js checks getViewMode() which we've mapped to non-card
+// when wall is active).
+
+const SS_WALL_ZOOM = 'dacum_wall_zoom';
+
+function _getWallZoom() {
+  const raw = sessionStorage.getItem(SS_WALL_ZOOM);
+  const n   = raw ? parseFloat(raw) : 1;
+  return (isFinite(n) && n >= 0.5 && n <= 1.5) ? n : 1;
+}
+
+function _setWallZoom(z) {
+  const clamped = Math.max(0.5, Math.min(1.5, z));
+  sessionStorage.setItem(SS_WALL_ZOOM, String(clamped));
+  return clamped;
+}
+
+function _renderWallView(container) {
+  container.className = 'wall-view-mode';
+  container.innerHTML = '';
+
+  // Hide Card-View's add-duty-card floating button (if present)
+  _setAddDutyVisibility('wall');
+
+  const duties = appState.dutiesData || [];
+
+  // Toolbar (always visible — outside scroll area)
+  container.appendChild(_makeWallToolbar());
+
+  // Empty-state
+  if (duties.length === 0) {
+    const empty = document.createElement('div');
+    empty.className = 'wall-empty-state';
+    empty.innerHTML = `
+      <div class="wall-empty-icon">🧱</div>
+      <h3>No duties yet</h3>
+      <p>Switch to Card View to add some duties and tasks, then come back.</p>
+      <button class="wall-btn-primary" data-view-switch="card">🃏 Go to Card View</button>
+    `;
+    empty.querySelector('[data-view-switch]').addEventListener('click', () => switchToViewMode('card'));
+    container.appendChild(empty);
+    return;
+  }
+
+  // Compute auto-zoom metrics once per render
+  const metrics = _computeWallAutoZoom(duties);
+  const userZoom = _getWallZoom();
+  const fontPx   = Math.round(metrics.fontSize * userZoom);
+  const cardW    = Math.round(metrics.cardWidth * userZoom);
+
+  // Apply CSS custom properties for this render
+  container.style.setProperty('--wv-font',      `${fontPx}px`);
+  container.style.setProperty('--wv-card-w',    `${cardW}px`);
+  container.style.setProperty('--wv-duty-w',    `${Math.round(220 * userZoom)}px`);
+  container.style.setProperty('--wv-task-gap',  `${Math.max(4, Math.round(8 * userZoom))}px`);
+
+  // Update zoom percentage label in the toolbar
+  const pctEl = container.querySelector('.wv-zoom-pct');
+  if (pctEl) pctEl.textContent = `${Math.round(userZoom * 100)}%`;
+
+  // Rows
+  const rows = document.createElement('div');
+  rows.className = 'wall-rows';
+  duties.forEach((duty, dutyIndex) => {
+    const letter = getDutyLetter(dutyIndex);
+    const row = document.createElement('div');
+    row.className = 'wall-row';
+    row.id = `wall_${duty.id}`;
+
+    const dutyCard = document.createElement('div');
+    dutyCard.className = 'wall-duty-card';
+    dutyCard.innerHTML = `
+      <span class="wall-duty-letter">Duty ${_esc(letter)}</span>
+      <span class="wall-duty-title">${_esc(duty.title) || '<em style="opacity:0.6">Untitled</em>'}</span>
+    `;
+
+    const tasksWrap = document.createElement('div');
+    tasksWrap.className = 'wall-tasks';
+
+    (duty.tasks || []).forEach((task, taskIndex) => {
+      const note = document.createElement('div');
+      note.className = 'wall-task-card';
+      note.innerHTML = `
+        <span class="wall-task-code">${_esc(letter)}${taskIndex + 1}</span>
+        <span class="wall-task-text">${_esc(task.text) || '<em style="opacity:0.5">—</em>'}</span>
+      `;
+      tasksWrap.appendChild(note);
+    });
+
+    row.appendChild(dutyCard);
+    row.appendChild(tasksWrap);
+    rows.appendChild(row);
+  });
+  container.appendChild(rows);
+}
+
+function _computeWallAutoZoom(duties) {
+  // Largest task row defines how small cards must be to fit a single line.
+  // We don't try to single-line everything (we let it wrap) — we just scale
+  // the baseline down when density is high.
+  const maxTasks = duties.reduce((m, d) => Math.max(m, (d.tasks || []).length), 0);
+  const totalDuties = duties.length;
+
+  // Rough viewport approximation — don't call getBoundingClientRect here
+  // because container might not be laid out yet at first call.
+  const vw = Math.max(800, window.innerWidth);
+
+  // Base card width target when there are up to 10 tasks per duty and
+  // 8 duties, on a 1400px viewport: ~130px card width, ~13px font.
+  // Scale down gracefully as density grows.
+  const densityFactor = Math.max(1, (maxTasks * totalDuties) / 60);
+  const cardWidth = Math.max(80, Math.min(160, 140 / Math.sqrt(densityFactor) * (vw / 1400)));
+  const fontSize  = Math.max(9,  Math.min(14, 13 / Math.sqrt(densityFactor) * (vw / 1400)));
+
+  return { cardWidth, fontSize };
+}
+
+function _makeWallToolbar() {
+  const bar = document.createElement('div');
+  bar.className = 'wall-toolbar';
+  bar.innerHTML = `
+    <div class="wv-left">
+      <button class="wv-btn wv-btn-exit" data-wv-action="exit"  title="Return to Card View (Esc)">✕ Exit</button>
+    </div>
+    <div class="wv-center">
+      <button class="wv-btn"  data-wv-action="zoom-out"  title="Zoom out (Ctrl+−)">🔍−</button>
+      <span class="wv-zoom-pct">100%</span>
+      <button class="wv-btn"  data-wv-action="zoom-in"   title="Zoom in (Ctrl++)">🔍+</button>
+      <button class="wv-btn"  data-wv-action="zoom-reset" title="Reset auto-zoom">⟲ Reset</button>
+    </div>
+    <div class="wv-right">
+      <button class="wv-btn"  data-wv-action="print"      title="Print wall">🖨 Print</button>
+      <button class="wv-btn"  data-wv-action="fullscreen" title="Toggle fullscreen">🖥 Fullscreen</button>
+    </div>
+  `;
+
+  bar.addEventListener('click', (e) => {
+    const btn = e.target.closest('[data-wv-action]');
+    if (!btn) return;
+    const action = btn.getAttribute('data-wv-action');
+    switch (action) {
+      case 'exit':        switchToViewMode('card'); _exitFullscreen(); break;
+      case 'zoom-in':     _setWallZoom(_getWallZoom() + 0.1); renderDutiesFromState(); break;
+      case 'zoom-out':    _setWallZoom(_getWallZoom() - 0.1); renderDutiesFromState(); break;
+      case 'zoom-reset':  _setWallZoom(1);                     renderDutiesFromState(); break;
+      case 'print':       window.print(); break;
+      case 'fullscreen':  _toggleFullscreen(); break;
+    }
+  });
+
+  return bar;
+}
+
+function _toggleFullscreen() {
+  const root = document.documentElement;
+  if (!document.fullscreenElement) {
+    if (root.requestFullscreen) root.requestFullscreen().catch(() => {});
+  } else {
+    _exitFullscreen();
+  }
+}
+
+function _exitFullscreen() {
+  if (document.fullscreenElement && document.exitFullscreen) {
+    document.exitFullscreen().catch(() => {});
+  }
+}
+
+// ── Global key + resize handlers for Wall View ────────────────
+// Wire once — idempotent via a module flag.
+let _wallHandlersWired = false;
+function _wireWallHandlers() {
+  if (_wallHandlersWired) return;
+  _wallHandlersWired = true;
+
+  // ESC → exit wall view (only when active)
+  document.addEventListener('keydown', (e) => {
+    if (e.key !== 'Escape') return;
+    if (document.body.classList.contains('wall-view-active') && !document.fullscreenElement) {
+      switchToViewMode('card');
+    }
+  });
+
+  // Ctrl/Cmd + = / − : zoom
+  document.addEventListener('keydown', (e) => {
+    if (!document.body.classList.contains('wall-view-active')) return;
+    if (!(e.ctrlKey || e.metaKey)) return;
+    if (e.key === '+' || e.key === '=') { e.preventDefault(); _setWallZoom(_getWallZoom() + 0.1); renderDutiesFromState(); }
+    else if (e.key === '-' || e.key === '_') { e.preventDefault(); _setWallZoom(_getWallZoom() - 0.1); renderDutiesFromState(); }
+    else if (e.key === '0') { e.preventDefault(); _setWallZoom(1); renderDutiesFromState(); }
+  });
+
+  // Auto-zoom recomputes on resize (only when active, debounced)
+  let rt = null;
+  window.addEventListener('resize', () => {
+    if (!document.body.classList.contains('wall-view-active')) return;
+    clearTimeout(rt);
+    rt = setTimeout(() => renderDutiesFromState(), 180);
+  });
+}
+_wireWallHandlers();

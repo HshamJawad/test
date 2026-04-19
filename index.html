@@ -314,6 +314,281 @@
         box-shadow: 0 0 0 2px #667eea, 0 6px 18px rgba(102,126,234,0.30) !important;
         outline: none !important;
       }
+
+      /* ══════════════════════════════════════════════════════════
+         Segmented view switch (Card / Table / Wall)
+         ══════════════════════════════════════════════════════════ */
+      .view-segmented {
+        display: inline-flex;
+        background: #f1f5f9;
+        border: 1px solid #cbd5e1;
+        border-radius: 9px;
+        padding: 3px;
+        gap: 2px;
+      }
+      .view-seg-btn {
+        background: transparent;
+        border: none;
+        padding: 7px 14px;
+        font-size: 0.88em;
+        font-weight: 600;
+        color: #475569;
+        border-radius: 6px;
+        cursor: pointer;
+        transition: background 0.15s, color 0.15s, box-shadow 0.15s;
+        white-space: nowrap;
+      }
+      .view-seg-btn:hover { background: rgba(102,126,234,0.08); color: #4338ca; }
+      .view-seg-btn.is-active {
+        background: #ffffff;
+        color: #4338ca;
+        box-shadow: 0 1px 3px rgba(15,23,42,0.14), 0 0 0 1px rgba(102,126,234,0.25);
+      }
+
+      /* ══════════════════════════════════════════════════════════
+         WALL VIEW — read-only DACUM workshop display
+         ══════════════════════════════════════════════════════════
+         - Full-width (body.wall-view-active breaks container cap)
+         - Horizontal layout: blue duty card left, yellow task stickies flowing right
+         - Auto-zoom: --wv-font / --wv-card-w / --wv-duty-w / --wv-task-gap
+         - Read-only: no editing inputs, no drag, no add/remove buttons
+         ══════════════════════════════════════════════════════════ */
+
+      /* Break out of the max-width cap while Wall View is active */
+      body.wall-view-active .container {
+        max-width: none !important;
+        width: auto !important;
+        margin-left: 0 !important;
+        margin-right: 0 !important;
+        padding-left: 12px !important;
+        padding-right: 12px !important;
+      }
+      /* Hide non-Duties chrome to keep the wall clean */
+      body.wall-view-active .tab-buttons,
+      body.wall-view-active .tab-content:not(#duties-tab),
+      body.wall-view-active #refineResultsSection,
+      body.wall-view-active #scopeMissingWarning,
+      body.wall-view-active #duties-tab > h2,
+      body.wall-view-active #duties-tab > [data-action="clear-tab"],
+      body.wall-view-active #duties-tab > div:has(> #aiGenerateBtn) {
+        display: none !important;
+      }
+
+      /* Default feature custom-properties (overridden per render) */
+      .wall-view-mode {
+        --wv-font:     13px;
+        --wv-card-w:   130px;
+        --wv-duty-w:   220px;
+        --wv-task-gap: 8px;
+
+        width: 100%;
+        box-sizing: border-box;
+      }
+
+      /* Toolbar */
+      .wall-toolbar {
+        position: sticky;
+        top: 0;
+        z-index: 10;
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 8px;
+        padding: 8px 12px;
+        margin-bottom: 14px;
+        background: #ffffff;
+        border: 1px solid #e2e8f0;
+        border-radius: 10px;
+        box-shadow: 0 2px 8px rgba(15,23,42,0.06);
+        flex-wrap: wrap;
+      }
+      .wall-toolbar .wv-left,
+      .wall-toolbar .wv-center,
+      .wall-toolbar .wv-right {
+        display: flex; align-items: center; gap: 6px;
+      }
+      .wall-toolbar .wv-btn {
+        background: #f8fafc;
+        color: #334155;
+        border: 1px solid #cbd5e1;
+        border-radius: 7px;
+        padding: 6px 12px;
+        font-size: 0.85em;
+        font-weight: 600;
+        cursor: pointer;
+        transition: background 0.14s, border-color 0.14s, color 0.14s;
+        white-space: nowrap;
+      }
+      .wall-toolbar .wv-btn:hover { background:#eef2ff; border-color:#a5b4fc; color:#4338ca; }
+      .wall-toolbar .wv-btn-exit  {
+        background: #fef2f2; color: #991b1b; border-color: #fecaca;
+      }
+      .wall-toolbar .wv-btn-exit:hover { background:#fee2e2; border-color:#fca5a5; color:#7f1d1d; }
+      .wall-toolbar .wv-zoom-pct {
+        display: inline-block; min-width: 44px; text-align: center;
+        font-size: 0.85em; font-weight: 700; color: #475569;
+        font-variant-numeric: tabular-nums;
+      }
+
+      /* Rows container */
+      .wall-rows {
+        display: flex;
+        flex-direction: column;
+        gap: 10px;
+      }
+
+      /* A single row: blue Duty card on the left + yellow task stickies on the right */
+      .wall-row {
+        display: flex;
+        align-items: stretch;
+        gap: var(--wv-task-gap);
+        min-height: 56px;
+      }
+
+      .wall-duty-card {
+        flex-shrink: 0;
+        width: var(--wv-duty-w);
+        background: linear-gradient(135deg, #4f46e5 0%, #6366f1 100%);
+        color: #ffffff;
+        border-radius: 9px;
+        padding: 10px 12px;
+        display: flex;
+        flex-direction: column;
+        gap: 4px;
+        justify-content: center;
+        box-shadow: 0 2px 6px rgba(79,70,229,0.25);
+      }
+      .wall-duty-letter {
+        font-size: calc(var(--wv-font) * 0.95);
+        font-weight: 800;
+        letter-spacing: 0.3px;
+        opacity: 0.95;
+      }
+      .wall-duty-title {
+        font-size: var(--wv-font);
+        font-weight: 600;
+        line-height: 1.35;
+        word-break: break-word;
+      }
+
+      .wall-tasks {
+        flex: 1;
+        display: flex;
+        flex-wrap: wrap;
+        gap: var(--wv-task-gap);
+        align-items: flex-start;
+      }
+
+      /* Sticky-note style task cards */
+      .wall-task-card {
+        width: var(--wv-card-w);
+        min-height: calc(var(--wv-font) * 3.4);
+        background: #fef9c3;
+        border: 1px solid #fde68a;
+        border-radius: 6px;
+        padding: 6px 8px;
+        display: flex;
+        flex-direction: column;
+        gap: 2px;
+        box-shadow:
+          0 1px 2px rgba(161,98,7,0.10),
+          0 4px 8px rgba(161,98,7,0.06);
+        position: relative;
+        transition: transform 0.12s, box-shadow 0.12s;
+      }
+      .wall-task-card:hover {
+        transform: translateY(-2px) rotate(-0.3deg);
+        box-shadow:
+          0 2px 4px rgba(161,98,7,0.18),
+          0 10px 18px rgba(161,98,7,0.14);
+        z-index: 1;
+      }
+      .wall-task-code {
+        font-size: calc(var(--wv-font) * 0.78);
+        font-weight: 800;
+        color: #78350f;
+        letter-spacing: 0.25px;
+        opacity: 0.85;
+      }
+      .wall-task-text {
+        font-size: var(--wv-font);
+        color: #422006;
+        line-height: 1.35;
+        word-break: break-word;
+        overflow: hidden;
+      }
+
+      /* Empty-state */
+      .wall-empty-state {
+        text-align: center;
+        padding: 60px 20px;
+        color: #64748b;
+      }
+      .wall-empty-state .wall-empty-icon { font-size: 3.4em; opacity: 0.5; margin-bottom: 8px; }
+      .wall-empty-state h3 { margin: 8px 0; color: #334155; font-size: 1.25em; }
+      .wall-empty-state p  { margin: 0 0 18px; font-size: 0.95em; }
+      .wall-empty-state .wall-btn-primary {
+        background: linear-gradient(135deg, #4f46e5 0%, #6366f1 100%);
+        color: #ffffff;
+        border: none;
+        padding: 10px 22px;
+        font-size: 0.95em;
+        font-weight: 600;
+        border-radius: 8px;
+        cursor: pointer;
+        box-shadow: 0 2px 8px rgba(79,70,229,0.25);
+      }
+      .wall-empty-state .wall-btn-primary:hover { opacity: 0.92; }
+
+      /* ─── Responsive: stack duty card above tasks on narrow viewports ─── */
+      @media (max-width: 720px) {
+        .wall-view-mode { --wv-duty-w: 100%; }
+        .wall-row { flex-direction: column; }
+        .wall-duty-card { width: 100%; }
+      }
+
+      /* ─── Fullscreen: remove container padding, go edge-to-edge ─── */
+      body.wall-view-active:fullscreen,
+      body.wall-view-active:-webkit-full-screen {
+        background: #f1f5f9;
+      }
+      body.wall-view-active:fullscreen .container { padding: 8px !important; }
+
+      /* ─── Print: Wall View only ─── */
+      @media print {
+        body.wall-view-active {
+          background: #ffffff !important;
+        }
+        body.wall-view-active #dacumTopToolbar,
+        body.wall-view-active #dacumProjectsSidebar,
+        body.wall-view-active .wall-toolbar,
+        body.wall-view-active .tab-buttons {
+          display: none !important;
+        }
+        body.wall-view-active .container,
+        body.wall-view-active #dacumAppWrapper,
+        body.wall-view-active #duties-tab {
+          margin: 0 !important; padding: 0 !important; box-shadow: none !important;
+        }
+        .wall-view-mode {
+          --wv-font:     10px;
+          --wv-card-w:   100px;
+          --wv-duty-w:   150px;
+          --wv-task-gap: 4px;
+        }
+        .wall-row { page-break-inside: avoid; break-inside: avoid; }
+        .wall-task-card { box-shadow: none !important; border: 1px solid #d6d3d1; }
+        .wall-duty-card {
+          background: #4f46e5 !important;
+          -webkit-print-color-adjust: exact;
+          print-color-adjust: exact;
+        }
+        .wall-task-card {
+          background: #fef9c3 !important;
+          -webkit-print-color-adjust: exact;
+          print-color-adjust: exact;
+        }
+      }
     </style>
 </head>
 <body>
@@ -565,11 +840,15 @@
             </div>
 
             <!-- View toggle — sits between AI section and the duties area -->
-            <div style="display:flex; align-items:center; justify-content:space-between; margin: 18px 0 10px 0;">
+            <div style="display:flex; align-items:center; justify-content:space-between; margin: 18px 0 10px 0; flex-wrap:wrap; gap:10px;">
               <span id="dutiesViewHeading" style="font-size:1.05em; font-weight:700; color:#374151;">Card View — Duties &amp; Tasks</span>
-              <button id="btnToggleDutiesView" class="dcv-toggle-btn is-card">
-                📋 Table View
-              </button>
+              <div class="view-segmented" role="tablist" aria-label="Switch duties view">
+                <button data-view-switch="card"  class="view-seg-btn is-active" role="tab" aria-selected="true">🃏 Card</button>
+                <button data-view-switch="table" class="view-seg-btn"           role="tab" aria-selected="false">📋 Table</button>
+                <button data-view-switch="wall"  class="view-seg-btn"           role="tab" aria-selected="false" title="DACUM Workshop display — read-only wall view">🧱 Wall</button>
+              </div>
+              <!-- Legacy hidden button kept for backward compat (still wired in events.js) -->
+              <button id="btnToggleDutiesView" class="dcv-toggle-btn is-card" style="display:none;" aria-hidden="true">📋 Table View</button>
             </div>
             
             <div id="dutiesContainer"></div>
