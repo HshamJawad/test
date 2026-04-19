@@ -348,33 +348,40 @@
       /* ══════════════════════════════════════════════════════════
          WALL VIEW — read-only DACUM workshop display
          ══════════════════════════════════════════════════════════
-         - Full-width (body.wall-view-active breaks container cap)
-         - Horizontal layout: blue duty card left, yellow task stickies flowing right
-         - Auto-zoom: --wv-font / --wv-card-w / --wv-duty-w / --wv-task-gap
-         - Read-only: no editing inputs, no drag, no add/remove buttons
+         - Default (not fullscreen): sidebar + top toolbar STAY visible.
+           The wall content sits to the right of the sidebar and fills
+           the remaining viewport.  User can still switch projects.
+         - Fullscreen: sidebar + top toolbar + all tabs HIDE.  Only the
+           wall toolbar + rows remain.  Scrollbars appear on .wall-rows
+           when zoomed content overflows the viewport.
+         - Read-only: no editing inputs, no drag, no add/remove buttons.
          ══════════════════════════════════════════════════════════ */
 
-      /* Break out of the max-width cap while Wall View is active */
+      /* Break out of the container's max-width while Wall is active,
+         but DO NOT remove the sidebar margin — the sidebar stays. */
       body.wall-view-active .container {
         max-width: none !important;
         width: auto !important;
-        margin-left: 0 !important;
-        margin-right: 0 !important;
         padding-left: 12px !important;
         padding-right: 12px !important;
       }
-      /* Hide non-Duties chrome to keep the wall clean */
+
+      /* Hide non-Duties chrome inside the duties tab so the wall is clean,
+         but leave the sidebar + top toolbar alone for navigation. */
       body.wall-view-active .tab-buttons,
       body.wall-view-active .tab-content:not(#duties-tab),
       body.wall-view-active #refineResultsSection,
       body.wall-view-active #scopeMissingWarning,
       body.wall-view-active #duties-tab > h2,
       body.wall-view-active #duties-tab > [data-action="clear-tab"],
-      body.wall-view-active #duties-tab > div:has(> #aiGenerateBtn) {
+      body.wall-view-active #duties-tab > div:has(> #aiGenerateBtn),
+      body.wall-view-active #btnAddDuty,
+      body.wall-view-active #btnAddDutyCard,
+      body.wall-view-active #duties-tab > div:last-child {
         display: none !important;
       }
 
-      /* Default feature custom-properties (overridden per render) */
+      /* Default custom-properties (overridden per render in JS) */
       .wall-view-mode {
         --wv-font:     13px;
         --wv-card-w:   130px;
@@ -385,10 +392,10 @@
         box-sizing: border-box;
       }
 
-      /* Toolbar */
+      /* Toolbar — sticks to the top of the duties tab viewport */
       .wall-toolbar {
         position: sticky;
-        top: 0;
+        top: 60px;               /* below the 60px top app toolbar */
         z-index: 10;
         display: flex;
         align-items: center;
@@ -430,11 +437,20 @@
         font-variant-numeric: tabular-nums;
       }
 
-      /* Rows container */
+      /* Scrollable wrapper for rows — gives horizontal/vertical scrollbars
+         when zoomed content overflows.  Height is max so small content stays
+         top-aligned. */
+      .wall-rows-scroll {
+        width: 100%;
+        overflow: auto;
+        max-height: calc(100vh - 160px);   /* fits below toolbars */
+        border-radius: 8px;
+      }
       .wall-rows {
         display: flex;
         flex-direction: column;
         gap: 10px;
+        min-width: min-content;   /* ensures horizontal scroll when rows are wider than viewport */
       }
 
       /* A single row: blue Duty card on the left + yellow task stickies on the right */
@@ -540,6 +556,9 @@
       }
       .wall-empty-state .wall-btn-primary:hover { opacity: 0.92; }
 
+      /* Print-only header (hidden by default) */
+      .wall-print-header { display: none; }
+
       /* ─── Responsive: stack duty card above tasks on narrow viewports ─── */
       @media (max-width: 720px) {
         .wall-view-mode { --wv-duty-w: 100%; }
@@ -547,22 +566,81 @@
         .wall-duty-card { width: 100%; }
       }
 
-      /* ─── Fullscreen: remove container padding, go edge-to-edge ─── */
-      body.wall-view-active:fullscreen,
-      body.wall-view-active:-webkit-full-screen {
-        background: #f1f5f9;
+      /* ══════════════════════════════════════════════════════════
+         FULLSCREEN mode — strip everything except wall + toolbar
+         Scrollbars appear on .wall-rows-scroll when zoomed content
+         exceeds viewport, so the user can pan horizontally/vertically.
+         ══════════════════════════════════════════════════════════ */
+      :fullscreen body.wall-view-active #dacumTopToolbar,
+      :fullscreen body.wall-view-active #dacumProjectsSidebar,
+      :fullscreen body.wall-view-active .tab-buttons,
+      :fullscreen body.wall-view-active #refineResultsSection,
+      :fullscreen body.wall-view-active #scopeMissingWarning,
+      :fullscreen body.wall-view-active #dutiesViewHeading,
+      :fullscreen body.wall-view-active .view-segmented,
+      :fullscreen body.wall-view-active #btnToggleDutiesView,
+      body.wall-view-fullscreen #dacumTopToolbar,
+      body.wall-view-fullscreen #dacumProjectsSidebar,
+      body.wall-view-fullscreen .tab-buttons,
+      body.wall-view-fullscreen #refineResultsSection,
+      body.wall-view-fullscreen #scopeMissingWarning,
+      body.wall-view-fullscreen #dutiesViewHeading,
+      body.wall-view-fullscreen .view-segmented,
+      body.wall-view-fullscreen #btnToggleDutiesView {
+        display: none !important;
       }
-      body.wall-view-active:fullscreen .container { padding: 8px !important; }
+      :fullscreen body.wall-view-active .container,
+      body.wall-view-fullscreen .container {
+        margin-left: 0 !important;
+        padding: 6px !important;
+      }
+      :fullscreen body.wall-view-active #dacumAppWrapper,
+      body.wall-view-fullscreen #dacumAppWrapper {
+        margin-left: 0 !important;
+      }
+      :fullscreen body.wall-view-active .wall-toolbar,
+      body.wall-view-fullscreen .wall-toolbar {
+        top: 0;   /* no 60px top bar anymore */
+      }
+      :fullscreen body.wall-view-active .wall-rows-scroll,
+      body.wall-view-fullscreen .wall-rows-scroll {
+        max-height: calc(100vh - 70px);
+      }
 
-      /* ─── Print: Wall View only ─── */
+      /* Smooth scrollbars (optional cosmetic) */
+      .wall-rows-scroll::-webkit-scrollbar        { width: 10px; height: 10px; }
+      .wall-rows-scroll::-webkit-scrollbar-thumb  { background: #cbd5e1; border-radius: 6px; }
+      .wall-rows-scroll::-webkit-scrollbar-thumb:hover { background: #94a3b8; }
+
+      /* ══════════════════════════════════════════════════════════
+         PRINT — Wall View only
+         ══════════════════════════════════════════════════════════ */
+      @page {
+        margin: 12mm 10mm 14mm 10mm;
+        /* Browser date/title headers are user-controlled — user can
+           disable them in print dialog under "Headers and footers". */
+      }
       @media print {
         body.wall-view-active {
           background: #ffffff !important;
         }
+        /* Hide everything except the wall print header and rows */
         body.wall-view-active #dacumTopToolbar,
         body.wall-view-active #dacumProjectsSidebar,
         body.wall-view-active .wall-toolbar,
-        body.wall-view-active .tab-buttons {
+        body.wall-view-active .tab-buttons,
+        body.wall-view-active #dutiesViewHeading,
+        body.wall-view-active .view-segmented,
+        body.wall-view-active #btnToggleDutiesView,
+        body.wall-view-active [data-action="clear-tab"],
+        body.wall-view-active #btnAddDuty,
+        body.wall-view-active #btnAddDutyCard,
+        body.wall-view-active #refineResultsSection,
+        body.wall-view-active #scopeMissingWarning,
+        body.wall-view-active #aiGenerateBtn,
+        body.wall-view-active #duties-tab > div:has(> #aiGenerateBtn),
+        body.wall-view-active #duties-tab > div:first-of-type,
+        body.wall-view-active #duties-tab > div:last-child {
           display: none !important;
         }
         body.wall-view-active .container,
@@ -570,11 +648,37 @@
         body.wall-view-active #duties-tab {
           margin: 0 !important; padding: 0 !important; box-shadow: none !important;
         }
+        /* Print header (block-level, on first page only via CSS) */
+        body.wall-view-active .wall-print-header {
+          display: block !important;
+          text-align: center;
+          margin: 0 0 10mm 0;
+          padding-bottom: 4mm;
+          border-bottom: 1px solid #94a3b8;
+          page-break-after: avoid;
+          break-after: avoid;
+        }
+        body.wall-view-active .wall-print-header h1 {
+          font-size: 18pt;
+          font-weight: 700;
+          color: #1e293b;
+          margin: 0 0 3mm 0;
+        }
+        body.wall-view-active .wall-print-header p {
+          font-size: 11pt;
+          color: #475569;
+          margin: 0;
+        }
+        /* Rows: shrink and layout for print */
         .wall-view-mode {
           --wv-font:     10px;
           --wv-card-w:   100px;
           --wv-duty-w:   150px;
           --wv-task-gap: 4px;
+        }
+        .wall-rows-scroll {
+          overflow: visible !important;
+          max-height: none !important;
         }
         .wall-row { page-break-inside: avoid; break-inside: avoid; }
         .wall-task-card { box-shadow: none !important; border: 1px solid #d6d3d1; }
@@ -587,6 +691,14 @@
           background: #fef9c3 !important;
           -webkit-print-color-adjust: exact;
           print-color-adjust: exact;
+        }
+        /* Page number footer via @page counters (supported by Chrome/Edge) */
+        @page {
+          @bottom-center {
+            content: "Page " counter(page) " of " counter(pages);
+            font-size: 9pt;
+            color: #64748b;
+          }
         }
       }
     </style>
@@ -850,7 +962,14 @@
               <!-- Legacy hidden button kept for backward compat (still wired in events.js) -->
               <button id="btnToggleDutiesView" class="dcv-toggle-btn is-card" style="display:none;" aria-hidden="true">📋 Table View</button>
             </div>
-            
+
+            <!-- Print-only header for Wall View printouts.  Populated by duties.js
+                 before window.print() is called.  Hidden on-screen, visible only in print. -->
+            <div id="wallPrintHeader" class="wall-print-header" aria-hidden="true">
+                <h1 id="wallPrintTitle"></h1>
+                <p id="wallPrintSubtitle"></p>
+            </div>
+
             <div id="dutiesContainer"></div>
             <button class="btn-add" id="btnAddDuty">➕ Add Duty</button>
             

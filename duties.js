@@ -464,7 +464,11 @@ function _renderWallView(container) {
   const pctEl = container.querySelector('.wv-zoom-pct');
   if (pctEl) pctEl.textContent = `${Math.round(userZoom * 100)}%`;
 
-  // Rows
+  // Rows (inside a scroll wrapper so fullscreen can constrain height
+  // and show horizontal/vertical scrollbars when zoomed content overflows)
+  const scrollWrap = document.createElement('div');
+  scrollWrap.className = 'wall-rows-scroll';
+
   const rows = document.createElement('div');
   rows.className = 'wall-rows';
   duties.forEach((duty, dutyIndex) => {
@@ -497,7 +501,8 @@ function _renderWallView(container) {
     row.appendChild(tasksWrap);
     rows.appendChild(row);
   });
-  container.appendChild(rows);
+  scrollWrap.appendChild(rows);
+  container.appendChild(scrollWrap);
 }
 
 function _computeWallAutoZoom(duties) {
@@ -549,7 +554,7 @@ function _makeWallToolbar() {
       case 'zoom-in':     _setWallZoom(_getWallZoom() + 0.1); renderDutiesFromState(); break;
       case 'zoom-out':    _setWallZoom(_getWallZoom() - 0.1); renderDutiesFromState(); break;
       case 'zoom-reset':  _setWallZoom(1);                     renderDutiesFromState(); break;
-      case 'print':       window.print(); break;
+      case 'print':       _populatePrintHeader(); window.print(); break;
       case 'fullscreen':  _toggleFullscreen(); break;
     }
   });
@@ -557,10 +562,33 @@ function _makeWallToolbar() {
   return bar;
 }
 
+/**
+ * Populate the hidden #wallPrintHeader with the current project's title
+ * and subtitle.  Called right before window.print() so the header is
+ * always fresh and reflects the live values in Chart Info.
+ */
+function _populatePrintHeader() {
+  const titleEl = document.getElementById('wallPrintTitle');
+  const subEl   = document.getElementById('wallPrintSubtitle');
+  if (!titleEl || !subEl) return;
+
+  const occ  = (document.getElementById('occupationTitle')?.value || '').trim() || 'Untitled Occupation';
+  const job  = (document.getElementById('jobTitle')?.value        || '').trim();
+  const now  = new Date();
+  const date = now.toLocaleDateString(undefined, { day: '2-digit', month: 'short', year: 'numeric' });
+
+  titleEl.textContent = `DACUM Research Chart For — ${occ}`;
+  subEl.textContent   = job ? `${job} · ${date}` : date;
+}
+
 function _toggleFullscreen() {
   const root = document.documentElement;
   if (!document.fullscreenElement) {
-    if (root.requestFullscreen) root.requestFullscreen().catch(() => {});
+    if (root.requestFullscreen) {
+      root.requestFullscreen()
+        .then(() => { document.body.classList.add('wall-view-fullscreen'); })
+        .catch(() => {});
+    }
   } else {
     _exitFullscreen();
   }
@@ -570,6 +598,7 @@ function _exitFullscreen() {
   if (document.fullscreenElement && document.exitFullscreen) {
     document.exitFullscreen().catch(() => {});
   }
+  // Class is removed by the fullscreenchange handler below
 }
 
 // ── Global key + resize handlers for Wall View ────────────────
@@ -603,5 +632,60 @@ function _wireWallHandlers() {
     clearTimeout(rt);
     rt = setTimeout(() => renderDutiesFromState(), 180);
   });
+
+  // Fullscreen change — sync body class to real fullscreen state.
+  // Handles ESC-out-of-fullscreen, browser-close-of-fullscreen, etc.
+  document.addEventListener('fullscreenchange', () => {
+    if (document.fullscreenElement) {
+      document.body.classList.add('wall-view-fullscreen');
+    } else {
+      document.body.classList.remove('wall-view-fullscreen');
+    }
+  });
+
+  // Auto-exit Wall View when user switches to a non-duties tab.
+  // The app exposes switchTab via window.switchTab; the sidebar and
+  // various buttons call it.  We wrap it so any call that navigates
+  // away from duties-tab exits Wall View first, preventing the UI
+  // from getting stuck on a hidden tab (the known black-screen bug).
+  // Guarded so we don't double-wrap on multiple boots.
+  //
+  // Deferred because window.switchTab is assigned inside app.js at
+  // DOMContentLoaded time — this module may be imported before that.
+  function _wrapSwitchTab() {
+    if (typeof window.switchTab !== 'function' || window.switchTab._wallWrapped) return false;
+    const original = window.switchTab;
+    const wrapped = function (tabId) {
+      if (tabId !== 'duties-tab' && document.body.classList.contains('wall-view-active')) {
+        switchToViewMode('card');
+        _exitFullscreen();
+      }
+      return original.apply(this, arguments);
+    };
+    wrapped._wallWrapped = true;
+    window.switchTab = wrapped;
+    return true;
+  }
+  // Try now, and again after DOM is ready, and once more as a safety net
+  if (!_wrapSwitchTab()) {
+    document.addEventListener('DOMContentLoaded', () => {
+      if (!_wrapSwitchTab()) setTimeout(_wrapSwitchTab, 300);
+    });
+  }
+
+  // Also catch tab clicks that don't go through window.switchTab —
+  // e.g. explicit [data-tab] clicks or .tab-button clicks.  Any such
+  // click that targets a non-duties destination triggers Wall exit.
+  document.addEventListener('click', (e) => {
+    if (!document.body.classList.contains('wall-view-active')) return;
+    const tabTrigger = e.target.closest('[data-tab], .tab-button');
+    if (!tabTrigger) return;
+    const target = tabTrigger.getAttribute('data-tab') ||
+                   tabTrigger.getAttribute('data-tab-id') || '';
+    if (target && target !== 'duties-tab') {
+      switchToViewMode('card');
+      _exitFullscreen();
+    }
+  }, true);   // capture phase so we run BEFORE the tab handler
 }
 _wireWallHandlers();
